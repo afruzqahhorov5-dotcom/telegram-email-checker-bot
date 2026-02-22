@@ -1,40 +1,38 @@
 import requests
 import telebot
 from telebot import types
-import time
 import random
 import os
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
-# ===== TOKEN ENVdan olinadi =====
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 if not BOT_TOKEN:
-    print("❌ BOT_TOKEN topilmadi!")
     raise SystemExit("BOT_TOKEN yo‘q")
 
-bot = telebot.TeleBot(BOT_TOKEN, parse_mode="HTML")
+bot = telebot.TeleBot(
+    BOT_TOKEN,
+    parse_mode="HTML",
+    threaded=True,
+    num_threads=4
+)
 
-# 🔥 ENG MUHIM — webhookni o‘chiramiz
+# 🔥 webhookni majburan o‘chiramiz
 try:
     bot.remove_webhook()
     print("✅ Webhook o‘chirildi")
 except Exception as e:
-    print("❌ Webhook o‘chirish xato:", e)
+    print("Webhook xato:", e)
 
-# 🔥 Foydalanuvchi holati
+# foydalanuvchi holati
 user_waiting_email = set()
 
-# Proxy list
 PROXY_LIST = [
     {"http": "socks5://185.46.212.88:1080", "https": "socks5://185.46.212.88:1080"},
-    {"http": "socks5://103.149.162.194:1080", "https": "socks5://103.149.162.194:1080"},
-    {"http": "http://45.155.86.131:8080", "https": "http://45.155.86.131:8080"},
 ]
 
 USER_AGENTS = [
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-    "Mozilla/5.0 (iPhone; CPU iPhone OS 14_6 like Mac OS X) AppleWebKit/605.1.15",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
 ]
 
 # ================= SESSION =================
@@ -55,46 +53,26 @@ def create_session(use_proxy=False, proxy=None):
 def check_email(email):
     try:
         session = create_session()
-        response = session.post(
+        r = session.post(
             'https://api.fraudemail.com/email',
             json={'email': email},
             timeout=10
         )
-        if response.status_code == 200:
-            if 'valid_email' in response.text:
-                return True, "✅ Haqiqiy"
-            else:
-                return False, "❌ Yaroqsiz"
+        if r.status_code == 200 and 'valid_email' in r.text:
+            return "✅ Haqiqiy"
+        return "❌ Yaroqsiz"
     except Exception as e:
-        print("❌ Direct xato:", e)
-
-    # 🔁 Proxy orqali
-    for i, proxy in enumerate(PROXY_LIST):
-        try:
-            session = create_session(use_proxy=True, proxy=proxy)
-            response = session.post(
-                'https://api.fraudemail.com/email',
-                json={'email': email},
-                timeout=15
-            )
-            if response.status_code == 200:
-                if 'valid_email' in response.text:
-                    return True, f"✅ Haqiqiy (Proxy {i+1})"
-                else:
-                    return False, f"❌ Yaroqsiz (Proxy {i+1})"
-        except Exception as e:
-            print(f"❌ Proxy {i+1} xato:", e)
-            continue
-
-    return None, "❌ Ulanish imkonsiz"
+        print("check_email error:", e)
+        return "❌ Tekshirib bo‘lmadi"
 
 # ================= START =================
 @bot.message_handler(commands=['start', 'help'])
-def send_welcome(message):
-    markup = types.InlineKeyboardMarkup(row_width=2)
-    btn1 = types.InlineKeyboardButton("📧 Email tekshirish", callback_data="check")
-    btn2 = types.InlineKeyboardButton("🌐 Proxy status", callback_data="proxy")
-    markup.add(btn1, btn2)
+def start_handler(message):
+    markup = types.InlineKeyboardMarkup()
+    markup.add(
+        types.InlineKeyboardButton("📧 Email tekshirish", callback_data="check"),
+        types.InlineKeyboardButton("🌐 Proxy status", callback_data="proxy"),
+    )
 
     bot.send_message(
         message.chat.id,
@@ -105,9 +83,8 @@ def send_welcome(message):
 # ================= CALLBACK =================
 @bot.callback_query_handler(func=lambda call: True)
 def callback_handler(call):
-    print("CALLBACK:", call.data)  # 🔥 debug
-
     chat_id = call.message.chat.id
+    print("CALLBACK:", call.data)
 
     if call.data == "check":
         user_waiting_email.add(chat_id)
@@ -116,36 +93,27 @@ def callback_handler(call):
     elif call.data == "proxy":
         bot.send_message(chat_id, f"🌐 Proxy: {len(PROXY_LIST)} ta")
 
-# ================= EMAIL MESSAGE =================
-@bot.message_handler(func=lambda message: True)
-def check_email_handler(message):
-    print("MSG:", message.text)  # 🔥 debug
-
+# ================= EMAIL =================
+@bot.message_handler(content_types=['text'])
+def email_handler(message):
     chat_id = message.chat.id
+    text = message.text.strip()
+    print("MSG:", text)
 
     if chat_id not in user_waiting_email:
         return
 
-    email = message.text.strip()
-
-    if '@' not in email:
-        bot.send_message(chat_id, "❌ Noto'g'ri email format!")
+    if '@' not in text:
+        bot.send_message(chat_id, "❌ Noto'g'ri email!")
         return
 
     user_waiting_email.discard(chat_id)
 
-    status_msg = bot.send_message(
-        chat_id,
-        f"📧 {email} tekshirilmoqda..."
+    status = bot.send_message(chat_id, f"📧 {text} tekshirilmoqda...")
+    result = check_email(text)
+
+    bot.edit_message_text(
+        f"{result}\n\nEmail: {text}",
+        chat_id=chat_id,
+        message_id=status.message_id
     )
-
-    result, msg = check_email(email)
-
-    try:
-        bot.edit_message_text(
-            f"{msg}\n\nEmail: {email}",
-            chat_id=chat_id,
-            message_id=status_msg.message_id
-        )
-    except Exception:
-        bot.send_message(chat_id, f"{msg}\n\nEmail: {email}")
