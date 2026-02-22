@@ -83,6 +83,8 @@ def start_handler(message):
 # ================= CALLBACK =================
 @bot.callback_query_handler(func=lambda call: True)
 def callback_handler(call):
+    bot.answer_callback_query(call.id)  # 🔥 MUHIM
+
     chat_id = call.message.chat.id
     print("CALLBACK:", call.data)
 
@@ -94,16 +96,18 @@ def callback_handler(call):
         bot.send_message(chat_id, f"🌐 Proxy: {len(PROXY_LIST)} ta")
 
 # ================= EMAIL =================
-@bot.message_handler(content_types=['text'])
+@bot.message_handler(func=lambda m: True, content_types=['text'])
 def email_handler(message):
     chat_id = message.chat.id
     text = message.text.strip()
     print("MSG:", text)
 
+    # ❗ faqat tugmadan keyin
     if chat_id not in user_waiting_email:
         return
 
-    if '@' not in text:
+    # ❗ email validatsiya
+    if '@' not in text or '.' not in text:
         bot.send_message(chat_id, "❌ Noto'g'ri email!")
         return
 
@@ -112,8 +116,12 @@ def email_handler(message):
     status = bot.send_message(chat_id, f"📧 {text} tekshirilmoqda...")
     result = check_email(text)
 
-    bot.edit_message_text(
-        f"{result}\n\nEmail: {text}",
-        chat_id=chat_id,
-        message_id=status.message_id
-    )
+    try:
+        bot.edit_message_text(
+            f"{result}\n\nEmail: {text}",
+            chat_id=chat_id,
+            message_id=status.message_id
+        )
+    except Exception as e:
+        print("EDIT ERROR:", e)
+        bot.send_message(chat_id, f"{result}\n\nEmail: {text}")
