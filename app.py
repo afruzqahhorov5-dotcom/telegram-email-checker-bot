@@ -18,17 +18,18 @@ def run_bot():
             bot.infinity_polling(
                 skip_pending=True,
                 timeout=60,
-                long_polling_timeout=60
+                long_polling_timeout=60,
+                allowed_updates=["message", "callback_query"]
             )
         except Exception as e:
             print("❌ POLLING CRASH:", e)
-            time.sleep(5)
+            time.sleep(10)  # ← biroz ko‘proq kutamiz
 
 
 if __name__ == "__main__":
     print("🚀 MAIN START")
 
-    t = threading.Thread(target=run_bot)
+    t = threading.Thread(target=run_bot, daemon=True)  # 🔥 MUHIM
     t.start()
 
     port = int(os.environ.get("PORT", 10000))
