@@ -12,7 +12,7 @@ def home():
 
 
 def run_bot():
-    print("🤖 Bot ishga tushdi...")
+    print("🤖 Bot polling START...")
     while True:
         try:
             bot.infinity_polling(
@@ -21,14 +21,15 @@ def run_bot():
                 long_polling_timeout=60
             )
         except Exception as e:
-            print("❌ BOT CRASH:", e)
+            print("❌ POLLING CRASH:", e)
             time.sleep(5)
 
 
-# 🔥 MUHIM: threadni main ichida ishga tushiramiz
 if __name__ == "__main__":
-    threading.Thread(target=run_bot, daemon=True).start()
-    print("🚀 Bot thread start qilindi")
+    print("🚀 MAIN START")
+
+    t = threading.Thread(target=run_bot)
+    t.start()
 
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
