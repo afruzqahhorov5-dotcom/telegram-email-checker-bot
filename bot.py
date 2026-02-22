@@ -15,6 +15,13 @@ if not BOT_TOKEN:
 
 bot = telebot.TeleBot(BOT_TOKEN, parse_mode="HTML")
 
+# 🔥 ENG MUHIM — webhookni o‘chiramiz
+try:
+    bot.remove_webhook()
+    print("✅ Webhook o‘chirildi")
+except Exception as e:
+    print("❌ Webhook o‘chirish xato:", e)
+
 # 🔥 Foydalanuvchi holati
 user_waiting_email = set()
 
@@ -91,13 +98,15 @@ def send_welcome(message):
 
     bot.send_message(
         message.chat.id,
-        "👋 <b>Email tekshirish botiga xush kelibsiz</b>\nTugmani bosib boshlang.",
+        "👋 <b>Email tekshirish botiga xush kelibsiz</b>\nTugmani bosing.",
         reply_markup=markup
     )
 
 # ================= CALLBACK =================
 @bot.callback_query_handler(func=lambda call: True)
 def callback_handler(call):
+    print("CALLBACK:", call.data)  # 🔥 debug
+
     chat_id = call.message.chat.id
 
     if call.data == "check":
@@ -110,6 +119,8 @@ def callback_handler(call):
 # ================= EMAIL MESSAGE =================
 @bot.message_handler(func=lambda message: True)
 def check_email_handler(message):
+    print("MSG:", message.text)  # 🔥 debug
+
     chat_id = message.chat.id
 
     if chat_id not in user_waiting_email:
